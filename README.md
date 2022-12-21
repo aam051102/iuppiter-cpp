@@ -1,0 +1,2 @@
+# Iupitter CPP
+A nearly direct 1:1 port of the library Iuppiter, which allows for simple compression and decompression of text using the LZJB algorithm and Base64 encoding. It consists of a single header file with just a few functions.
