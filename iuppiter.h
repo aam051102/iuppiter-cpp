@@ -89,10 +89,9 @@ namespace Iuppiter
          */
         static std::string Encode(std::vector<uint32_t> input, bool urlSafe = false)
         {
-            size_t eLen;
+            // size_t eLen;
             size_t dLen;
             size_t sLen;
-            size_t left;
             size_t i;
             std::string ca;
 
@@ -104,18 +103,22 @@ namespace Iuppiter
             std::vector<uint32_t> sArr = input;
             sLen = sArr.size();
 
-            eLen = (sLen / 3) * 3;            // Length of even 24-bits.
+            // eLen = sLen - (sLen % 3);       // Length of even 24-bits.
             dLen = ((sLen - 1) / 3 + 1) << 2; // Length of returned array
 
             std::string dArr;
             dArr.resize(dLen);
 
             // Encode even 24-bits
-            for (size_t s = 0, d = 0; s < eLen;)
+            size_t b1, b2, b3;
+            for (size_t s = 0, d = 0; s < sLen;)
             {
+                b1 = sArr.size() > s ? sArr[s++] : 0;
+                b2 = sArr.size() > s ? sArr[s++] : 0;
+                b3 = sArr.size() > s ? sArr[s++] : 0;
+
                 // Copy next three bytes into lower 24 bits of int, paying attension to sign.
-                i = ((size_t)sArr[s++] & 0xff) << 16 | ((size_t)sArr[s++] & 0xff) << 8 |
-                    (sArr[s++] & 0xff);
+                i = (b1 & 0xff) << 16 | (b2 & 0xff) << 8 | (b3 & 0xff);
 
                 // Encode the int into four chars
                 dArr[d++] = ca[(i >> 18) & 0x3f];
@@ -125,7 +128,7 @@ namespace Iuppiter
             }
 
             // Pad and encode last bits if source isn't even 24 bits.
-            left = sLen - eLen; // 0 - 2.
+            /*uint8_t left = sLen - eLen; // 0 - 2.
             if (left > 0)
             {
                 // Prepare the int
@@ -136,7 +139,7 @@ namespace Iuppiter
                 dArr[dLen - 3] = ca[(i >> 6) & 0x3f];
                 dArr[dLen - 2] = left == 2 ? ca[i & 0x3f] : '=';
                 dArr[dLen - 1] = '=';
-            }
+            }*/
 
             return dArr;
         };
@@ -267,15 +270,15 @@ namespace Iuppiter
         size_t slen;
         size_t src = 0;
         size_t dst = 0;
-        size_t cpy;
+        int64_t cpy;
         size_t copymap;
-        size_t copymask = 1 << (NBBY - 1);
+        size_t copymask = (size_t)1 << (NBBY - 1);
         size_t mlen;
         size_t offset;
         size_t hp;
         size_t i;
 
-        int *lempel = new int[LEMPEL_SIZE];
+        int64_t *lempel = new int64_t[LEMPEL_SIZE];
 
         // Initialize lempel array.
         for (i = 0; i < LEMPEL_SIZE; i++)
@@ -291,7 +294,7 @@ namespace Iuppiter
 
         while (src < slen)
         {
-            if ((copymask <<= 1) == (1 << NBBY))
+            if ((copymask <<= 1) == ((size_t)1 << NBBY))
             {
                 if (dst >= slen - 1 - 2 * NBBY)
                 {
@@ -299,7 +302,16 @@ namespace Iuppiter
 
                     for (src = 0, dst = 0; mlen; mlen--)
                     {
-                        dstart[dst++] = sstart[src++];
+                        if (dstart.size() <= dst)
+                        {
+                            dstart.push_back(sstart[src]);
+                        }
+                        else
+                        {
+                            dstart[dst] = sstart[src];
+                        }
+                        src++;
+                        dst++;
                     }
 
                     return dstart;
@@ -307,7 +319,17 @@ namespace Iuppiter
 
                 copymask = 1;
                 copymap = dst;
-                dstart[dst++] = 0;
+
+                if (dstart.size() <= dst)
+                {
+                    dstart.push_back(0);
+                }
+                else
+                {
+                    dstart[dst] = 0;
+                }
+
+                dst++;
             }
 
             if (src > slen - MATCH_MAX)
@@ -316,11 +338,8 @@ namespace Iuppiter
                 continue;
             }
 
-            hp = ((sstart[src] + 13) ^
-                  (sstart[src + 1] - 13) ^
-                  sstart[src + 2]) &
-                 (LEMPEL_SIZE - 1);
-            offset = (src - lempel[hp]) & OFFSET_MASK;
+            hp = (((size_t)sstart[src] + 13) ^ ((size_t)sstart[src + 1] - 13) ^ sstart[src + 2]) & ((size_t)LEMPEL_SIZE - 1);
+            offset = ((int64_t)src - lempel[hp]) & OFFSET_MASK;
             lempel[hp] = src;
             cpy = src - offset;
 
@@ -339,16 +358,26 @@ namespace Iuppiter
                     }
                 }
 
-                dstart[dst++] = ((mlen - MATCH_MIN) << (NBBY - MATCH_BITS)) |
-                                (offset >> NBBY);
+                dstart[dst++] = ((mlen - MATCH_MIN) << (NBBY - MATCH_BITS)) | (offset >> NBBY);
                 dstart[dst++] = offset;
                 src += mlen;
             }
             else
             {
-                dstart[dst++] = sstart[src++];
+                if (dstart.size() <= dst)
+                {
+                    dstart.push_back(sstart[src]);
+                }
+                else
+                {
+                    dstart[dst] = sstart[src];
+                }
+                src++;
+                dst++;
             }
         }
+
+        delete[] lempel;
 
         return dstart;
     }
