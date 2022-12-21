@@ -1,7 +1,7 @@
 # Iuppiter CPP
 A nearly direct 1:1 port of the library Iuppiter, which allows for simple compression and decompression of text using the LZJB algorithm and Base64 encoding. It consists of a single header file with just a few functions.
 
-NOTE: The actual script that I ported seems to be broken in some ways, so this is probably broken in those same ways.
+NOTE: The actual implementation that I ported seems to have issues when the input is too short, so this probably has the same issue.
 
 ## Usage
 ```cpp
