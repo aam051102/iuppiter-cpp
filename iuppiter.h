@@ -87,7 +87,7 @@ namespace Iuppiter
          * @param urlsafe True if you want to make encoded string is url safe.
          * @return Encoded base64 string.
          */
-        static std::string Encode(std::vector<uint32_t> input, bool urlSafe)
+        static std::string Encode(std::vector<uint32_t> input, bool urlSafe = false)
         {
             size_t eLen;
             size_t dLen;

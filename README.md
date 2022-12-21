@@ -15,10 +15,10 @@ int main() {
     auto compressed = Iuppiter::Compress(Iuppiter::StringToByteArray(input));
 
     // To Base64
-    auto base64 = Iuppiter::ByteArrayToString(Iuppiter::Base64::Encode(compressed));
+    auto base64 = Iuppiter::Base64::Encode(compressed);
 
     // Decoded byte array
-    auto decoded = Iuppiter::Decode(Iuppiter::StringToByteArray(base64));
+    auto decoded = Iuppiter::Base64::Decode(Iuppiter::StringToByteArray(base64));
 
     // Decompressed string
     auto decompressed = Iuppiter::ByteArrayToString(Iuppiter::Decompress(decoded));
