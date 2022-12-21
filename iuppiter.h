@@ -78,167 +78,170 @@ namespace Iuppiter
         IA['='] = IAS['='] = 0;
     }
 
-    /**
-     * Encode base64.
-     *
-     * @param input A byte array.
-     * @param urlsafe True if you want to make encoded string is url safe.
-     * @return Encoded base64 string.
-     */
-    static std::string Encode(std::vector<uint32_t> input, bool urlSafe)
+    namespace Base64
     {
-        size_t eLen;
-        size_t dLen;
-        size_t sLen;
-        size_t left;
-        size_t i;
-        std::string ca;
-
-        if (urlSafe)
-            ca = CAS;
-        else
-            ca = CA;
-
-        std::vector<uint32_t> sArr = input;
-        sLen = sArr.size();
-
-        eLen = (sLen / 3) * 3;            // Length of even 24-bits.
-        dLen = ((sLen - 1) / 3 + 1) << 2; // Length of returned array
-
-        std::string dArr;
-        dArr.resize(dLen);
-
-        // Encode even 24-bits
-        for (size_t s = 0, d = 0; s < eLen;)
+        /**
+         * Encode base64.
+         *
+         * @param input A byte array.
+         * @param urlsafe True if you want to make encoded string is url safe.
+         * @return Encoded base64 string.
+         */
+        static std::string Encode(std::vector<uint32_t> input, bool urlSafe)
         {
-            // Copy next three bytes into lower 24 bits of int, paying attension to sign.
-            i = ((size_t)sArr[s++] & 0xff) << 16 | ((size_t)sArr[s++] & 0xff) << 8 |
-                (sArr[s++] & 0xff);
+            size_t eLen;
+            size_t dLen;
+            size_t sLen;
+            size_t left;
+            size_t i;
+            std::string ca;
 
-            // Encode the int into four chars
-            dArr[d++] = ca[(i >> 18) & 0x3f];
-            dArr[d++] = ca[(i >> 12) & 0x3f];
-            dArr[d++] = ca[(i >> 6) & 0x3f];
-            dArr[d++] = ca[i & 0x3f];
-        }
+            if (urlSafe)
+                ca = CAS;
+            else
+                ca = CA;
 
-        // Pad and encode last bits if source isn't even 24 bits.
-        left = sLen - eLen; // 0 - 2.
-        if (left > 0)
+            std::vector<uint32_t> sArr = input;
+            sLen = sArr.size();
+
+            eLen = (sLen / 3) * 3;            // Length of even 24-bits.
+            dLen = ((sLen - 1) / 3 + 1) << 2; // Length of returned array
+
+            std::string dArr;
+            dArr.resize(dLen);
+
+            // Encode even 24-bits
+            for (size_t s = 0, d = 0; s < eLen;)
+            {
+                // Copy next three bytes into lower 24 bits of int, paying attension to sign.
+                i = ((size_t)sArr[s++] & 0xff) << 16 | ((size_t)sArr[s++] & 0xff) << 8 |
+                    (sArr[s++] & 0xff);
+
+                // Encode the int into four chars
+                dArr[d++] = ca[(i >> 18) & 0x3f];
+                dArr[d++] = ca[(i >> 12) & 0x3f];
+                dArr[d++] = ca[(i >> 6) & 0x3f];
+                dArr[d++] = ca[i & 0x3f];
+            }
+
+            // Pad and encode last bits if source isn't even 24 bits.
+            left = sLen - eLen; // 0 - 2.
+            if (left > 0)
+            {
+                // Prepare the int
+                i = (((size_t)sArr[eLen] & 0xff) << 10) | (left == 2 ? (((size_t)sArr[sLen - 1] & 0xff) << 2) : 0);
+
+                // Set last four chars
+                dArr[dLen - 4] = ca[i >> 12];
+                dArr[dLen - 3] = ca[(i >> 6) & 0x3f];
+                dArr[dLen - 2] = left == 2 ? ca[i & 0x3f] : '=';
+                dArr[dLen - 1] = '=';
+            }
+
+            return dArr;
+        };
+
+        /**
+         * Decode base64 encoded string or byte array.
+         *
+         * @param input A byte array.
+         * @param urlsafe True if the encoded string is encoded by urlsafe.
+         * @return A decoded byte array.
+         */
+        static std::vector<uint32_t> Decode(std::vector<uint32_t> input, bool urlSafe = false)
         {
-            // Prepare the int
-            i = (((size_t)sArr[eLen] & 0xff) << 10) | (left == 2 ? (((size_t)sArr[sLen - 1] & 0xff) << 2) : 0);
+            std::vector<int32_t> ia;
+            size_t sIx;
+            size_t eIx;
+            size_t cCnt;
+            size_t sepCnt;
+            size_t pad;
+            size_t sLen;
+            size_t eLen;
+            size_t len;
+            size_t d;
+            size_t cc;
+            size_t i;
+            size_t j;
+            size_t r;
 
-            // Set last four chars
-            dArr[dLen - 4] = ca[i >> 12];
-            dArr[dLen - 3] = ca[(i >> 6) & 0x3f];
-            dArr[dLen - 2] = left == 2 ? ca[i & 0x3f] : '=';
-            dArr[dLen - 1] = '=';
+            if (urlSafe)
+            {
+                ia = IAS;
+            }
+            else
+            {
+                ia = IA;
+            }
+
+            std::vector<uint32_t> sArr = input;
+            sLen = sArr.size();
+
+            sIx = 0;
+            eIx = sLen - 1; // Start and end index after trimming.
+
+            // Trim illegal chars from start
+            while (sIx < eIx && ia[sArr[sIx]] < 0)
+            {
+                sIx++;
+            }
+
+            // Trim illegal chars from end
+            while (eIx > 0 && ia[sArr[eIx]] < 0)
+            {
+                eIx--;
+            }
+
+            // get the padding count (=) (0, 1 or 2)
+            // Count '=' at end.
+            pad = sArr[eIx] == '=' ? (sArr[eIx - 1] == '=' ? 2 : 1) : 0;
+            cCnt = eIx - sIx + 1; // Content count including possible separators
+            sepCnt = sLen > 76 ? (sArr[76] == '\r' ? cCnt / 78 : 0) << 1 : 0;
+
+            // The number of decoded bytes
+            len = ((cCnt - sepCnt) * 6 >> 3) - pad;
+
+            std::vector<uint32_t> dArr;
+            dArr.resize(len);
+
+            // Decode all but the last 0 - 2 bytes.
+            d = 0;
+            for (cc = 0, eLen = (len / 3) * 3; d < eLen;)
+            {
+                // Assemble three bytes into an int from four "valid" characters.
+                i = (size_t)ia[sArr[sIx++]] << 18 | (size_t)ia[sArr[sIx++]] << 12 | (size_t)ia[sArr[sIx++]] << 6 | ia[sArr[sIx++]];
+
+                // Add the bytes
+                dArr[d++] = (i >> 16) & 0xff;
+                dArr[d++] = (i >> 8) & 0xff;
+                dArr[d++] = i & 0xff;
+
+                // If line separator, jump over it.
+                if (sepCnt > 0 && ++cc == 19)
+                {
+                    sIx += 2;
+                    cc = 0;
+                }
+            }
+
+            if (d < len)
+            {
+                // Decode last 1-3 bytes (incl '=') into 1-3 bytes
+                i = 0;
+                for (j = 0; sIx <= eIx - pad; j++)
+                {
+                    i |= (size_t)ia[sArr[sIx++]] << (18 - j * 6);
+                }
+
+                for (r = 16; d < len; r -= 8)
+                {
+                    dArr[d++] = (i >> r) & 0xff;
+                }
+            }
+
+            return dArr;
         }
-
-        return dArr;
     };
-
-    /**
-     * Decode base64 encoded string or byte array.
-     *
-     * @param input A byte array.
-     * @param urlsafe True if the encoded string is encoded by urlsafe.
-     * @return A decoded byte array.
-     */
-    static std::vector<uint32_t> Decode(std::vector<uint32_t> input, bool urlSafe = false)
-    {
-        std::vector<int32_t> ia;
-        size_t sIx;
-        size_t eIx;
-        size_t cCnt;
-        size_t sepCnt;
-        size_t pad;
-        size_t sLen;
-        size_t eLen;
-        size_t len;
-        size_t d;
-        size_t cc;
-        size_t i;
-        size_t j;
-        size_t r;
-
-        if (urlSafe)
-        {
-            ia = IAS;
-        }
-        else
-        {
-            ia = IA;
-        }
-
-        std::vector<uint32_t> sArr = input;
-        sLen = sArr.size();
-
-        sIx = 0;
-        eIx = sLen - 1; // Start and end index after trimming.
-
-        // Trim illegal chars from start
-        while (sIx < eIx && ia[sArr[sIx]] < 0)
-        {
-            sIx++;
-        }
-
-        // Trim illegal chars from end
-        while (eIx > 0 && ia[sArr[eIx]] < 0)
-        {
-            eIx--;
-        }
-
-        // get the padding count (=) (0, 1 or 2)
-        // Count '=' at end.
-        pad = sArr[eIx] == '=' ? (sArr[eIx - 1] == '=' ? 2 : 1) : 0;
-        cCnt = eIx - sIx + 1; // Content count including possible separators
-        sepCnt = sLen > 76 ? (sArr[76] == '\r' ? cCnt / 78 : 0) << 1 : 0;
-
-        // The number of decoded bytes
-        len = ((cCnt - sepCnt) * 6 >> 3) - pad;
-
-        std::vector<uint32_t> dArr;
-        dArr.resize(len);
-
-        // Decode all but the last 0 - 2 bytes.
-        d = 0;
-        for (cc = 0, eLen = (len / 3) * 3; d < eLen;)
-        {
-            // Assemble three bytes into an int from four "valid" characters.
-            i = (size_t)ia[sArr[sIx++]] << 18 | (size_t)ia[sArr[sIx++]] << 12 | (size_t)ia[sArr[sIx++]] << 6 | ia[sArr[sIx++]];
-
-            // Add the bytes
-            dArr[d++] = (i >> 16) & 0xff;
-            dArr[d++] = (i >> 8) & 0xff;
-            dArr[d++] = i & 0xff;
-
-            // If line separator, jump over it.
-            if (sepCnt > 0 && ++cc == 19)
-            {
-                sIx += 2;
-                cc = 0;
-            }
-        }
-
-        if (d < len)
-        {
-            // Decode last 1-3 bytes (incl '=') into 1-3 bytes
-            i = 0;
-            for (j = 0; sIx <= eIx - pad; j++)
-            {
-                i |= (size_t)ia[sArr[sIx++]] << (18 - j * 6);
-            }
-
-            for (r = 16; d < len; r -= 8)
-            {
-                dArr[d++] = (i >> r) & 0xff;
-            }
-        }
-
-        return dArr;
-    }
 
     /**
      * Compress string or byte array using fast and efficient algorithm.
@@ -483,5 +486,4 @@ namespace Iuppiter
         return s;
     }
 };
-
 #endif
